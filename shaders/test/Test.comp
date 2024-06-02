@@ -1,0 +1,227 @@
+#version 450
+
+uvec2 IndexToXY(const uint fMaxX, const uint fIndex){
+	uint y = uint( floor( fIndex / fMaxX) );
+	uint x= fIndex - y * fMaxX;
+
+    uvec2 rtn;
+    rtn.x=x;
+    rtn.y=y;
+
+    return rtn;
+}
+uint XYtoIndex(const uint fMaxX, const uvec2 fXY){
+	uint rtn = fXY.x + fXY.y * fMaxX;
+    return rtn;
+}
+
+uvec2 IndexLimited(ivec2 fIndex, const uint fMaxX, const uint fMaxY){
+	uvec2 rtn;
+	
+	rtn.x=min(max(fIndex.x,0), int(fMaxX - 1));
+	rtn.y=min(max(fIndex.y,0), int(fMaxY - 1));
+	return rtn;
+}
+struct InterpolationPressureRtn{
+	uvec4 Index;
+	vec2 AlpahBelta;
+};
+InterpolationPressureRtn InterpolationPressure(const vec2 fPosition, const uint fMaxX, const uint fMaxY){
+	ivec2 IndexCell;
+	IndexCell.x= int(floor(fPosition.x - 0.5));
+	IndexCell.y= int(floor(fPosition.y - 0.5));
+
+	ivec2 IndexCellRight;
+	IndexCellRight.x = IndexCell.x + 1;
+	IndexCellRight.y = IndexCell.y;
+
+	ivec2 IndexCellUp;
+	IndexCellUp.x = IndexCell.x;
+	IndexCellUp.y = IndexCell.y + 1;
+
+	ivec2 IndexCellUpRight;
+	IndexCellUpRight.x = IndexCell.x + 1;
+	IndexCellUpRight.y = IndexCell.y + 1;
+
+	uvec2 IndexCellLimites=IndexLimited(IndexCell, fMaxX, fMaxY);
+	uvec2 IndexCellRightLimites=IndexLimited(IndexCellRight, fMaxX, fMaxY);
+	uvec2 IndexCellUpLimites=IndexLimited(IndexCellUp, fMaxX, fMaxY);
+	uvec2 IndexCellUpRightLimites=IndexLimited(IndexCellUpRight, fMaxX, fMaxY);
+	
+	float Alpha = fPosition.x - 0.5 - IndexCell.x;
+	float Belta = fPosition.y - 0.5 - IndexCell.y;;
+
+
+	InterpolationPressureRtn rtn;
+
+	rtn.Index.x = XYtoIndex(fMaxX,IndexCellLimites);
+	rtn.Index.y = XYtoIndex(fMaxX,IndexCellRightLimites);
+	rtn.Index.z = XYtoIndex(fMaxX,IndexCellUpLimites);
+	rtn.Index.w = XYtoIndex(fMaxX,IndexCellUpRightLimites);
+	rtn.AlpahBelta.x = Alpha;
+	rtn.AlpahBelta.y = Belta;
+
+	return rtn;
+}
+struct InterpolationVelocityRtn{
+	uvec4 IndexU;
+	vec2 AlpahBeltaU;
+	uvec4 IndexV;
+	vec2 AlpahBeltaV;
+};
+InterpolationVelocityRtn InterpolationVelocity(const vec2 fPosition, const uint fMaxX, const uint fMaxY){
+	ivec2 IndexU;
+	IndexU.x= int(floor(fPosition.x));
+	IndexU.y= int(floor(fPosition.y - 0.5));
+	ivec2 IndexURight;
+	IndexURight.x = IndexU.x + 1;
+	IndexURight.y = IndexU.y;
+	ivec2 IndexUUp;
+	IndexUUp.x = IndexU.x;
+	IndexUUp.y = IndexU.y + 1;
+	ivec2 IndexUUpRight;
+	IndexUUpRight.x = IndexU.x + 1;
+	IndexUUpRight.y = IndexU.y + 1;
+
+	uvec2 IndexULimites=IndexLimited(IndexU, fMaxX, fMaxY);
+	uvec2 IndexURightLimites=IndexLimited(IndexURight, fMaxX, fMaxY);
+	uvec2 IndexUUpLimites=IndexLimited(IndexUUp, fMaxX, fMaxY);
+	uvec2 IndexUUpRightLimites=IndexLimited(IndexUUpRight, fMaxX, fMaxY);
+
+	float AlphaU = fPosition.x - IndexU.x;
+	float BeltaU = fPosition.y - 0.5 - IndexU.y;;
+	
+	ivec2 IndexV;
+	IndexV.x= int(floor(fPosition.x - 0.5));
+	IndexV.y= int(floor(fPosition.y));
+	ivec2 IndexVRight;
+	IndexVRight.x = IndexV.x + 1;
+	IndexVRight.y = IndexV.y;
+	ivec2 IndexVUp;
+	IndexVUp.x = IndexV.x;
+	IndexVUp.y = IndexV.y + 1;
+	ivec2 IndexVUpRight;
+	IndexVUpRight.x = IndexV.x + 1;
+	IndexVUpRight.y = IndexV.y + 1;
+
+	uvec2 IndexVLimites=IndexLimited(IndexV, fMaxX, fMaxY);
+	uvec2 IndexVRightLimites=IndexLimited(IndexVRight, fMaxX, fMaxY);
+	uvec2 IndexVUpLimites=IndexLimited(IndexVUp, fMaxX, fMaxY);
+	uvec2 IndexVUpRightLimites=IndexLimited(IndexVUpRight, fMaxX, fMaxY);
+	
+	float AlphaV = fPosition.x - 0.5 - IndexV.x;
+	float BeltaV = fPosition.y - IndexV.y;;
+
+	InterpolationVelocityRtn rtn;
+	rtn.IndexU.x = XYtoIndex(fMaxX,IndexULimites);
+	rtn.IndexU.y = XYtoIndex(fMaxX,IndexURightLimites);
+	rtn.IndexU.z = XYtoIndex(fMaxX,IndexUUpLimites);
+	rtn.IndexU.w = XYtoIndex(fMaxX,IndexUUpRightLimites);
+	rtn.AlpahBeltaU.x = AlphaU;
+	rtn.AlpahBeltaU.y = BeltaU;
+
+	rtn.IndexV.x = XYtoIndex(fMaxX,IndexVLimites);
+	rtn.IndexV.y = XYtoIndex(fMaxX,IndexVRightLimites);
+	rtn.IndexV.z = XYtoIndex(fMaxX,IndexVUpLimites);
+	rtn.IndexV.w = XYtoIndex(fMaxX,IndexVUpRightLimites);
+	rtn.AlpahBeltaV.x = AlphaV;
+	rtn.AlpahBeltaV.y = BeltaV;
+
+	return rtn;
+}
+
+
+struct TestData{
+float data;
+};
+
+
+
+layout(binding = 0) readonly buffer Vec3ArraySSBOIn {
+   TestData Vec3ArrayIn[ ];
+}vin;
+layout(binding = 1) buffer Vec3ArraySSBOOut {
+   TestData Vec3ArrayOut[ ];
+}vout;
+layout(binding = 2) uniform Ufo {
+  uint MaxCount;
+}ufo;
+
+
+
+shared uint localArray[64];
+
+layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+
+float i3=0.333f;
+float i2=0.5f;
+
+void main() {
+    uint globalid = uint(gl_GlobalInvocationID.x); 
+    
+
+
+    vout.Vec3ArrayOut[globalid].data = vin.Vec3ArrayIn[1024].data;
+}
+
+
+	/*
+    uint MaxInt = uint(int(0x7FFFFFFF));
+	uint Xint = fIndex.x;
+	uint XIsSmallerThan0 = uint(floor(Xint/MaxInt));
+	int Xmiddle = int((1 - XIsSmallerThan0) * Xint) ;
+
+	uint XIsBiggerThanMaxX = uint(floor(Xmiddle/fMaxX));
+	uint Xfinal = XIsBiggerThanMaxX * fMaxX - (1 - XIsBiggerThanMaxX) * Xmiddle;
+	rtn.x = Xfinal;
+
+	uint Yint = fIndex.y;
+	uint YIsSmallerThan0 = uint(floor(Yint/MaxInt));
+	int Ymiddle = int((1 - YIsSmallerThan0) * Yint) ;
+
+	uint YIsBiggerThanMaxX = uint(floor(Ymiddle/fMaxY));
+	uint Yfinal = YIsBiggerThanMaxX * fMaxY - (1 - YIsBiggerThanMaxX) * Ymiddle;
+
+	rtn.y= Yfinal;
+	*/
+
+
+	
+ /*
+    if(count == 1){
+        vout.Vec3ArrayOut[index] = (vin.Vec3ArrayIn[index] + vin.Vec3ArrayIn[index + 1]) / 2;
+    }
+    if(count == ufo.MaxCount){
+        vout.Vec3ArrayOut[index] = (vin.Vec3ArrayIn[index] + vin.Vec3ArrayIn[index - 1]) / 2;
+    }
+    if(count != ufo.MaxCount && count != 1){
+    vout.Vec3ArrayOut[index] = (vin.Vec3ArrayIn[index] + vin.Vec3ArrayIn[index + 1] + vin.Vec3ArrayIn[index - 1]) / 3;
+    }*/
+
+
+
+    /*
+    uint globalid = uint(gl_GlobalInvocationID.x); 
+    uint globalSize=uint(gl_WorkGroupSize.x);
+
+    uint workgroupid=uint(gl_WorkGroupID.x);
+
+    uint localId=uint(gl_LocalInvocationID.x);
+
+    uint count = globalid + 1;
+   
+    localArray[localId] =vin.Vec3ArrayIn[globalid];
+
+    for (uint stride = 64/2; stride>0; stride /=2)
+     {
+      // Waiting for each 2x2 addition into given workgroup
+      barrier();
+
+      // Add elements 2 by 2 between local_id and local_id + stride
+      if (localId < stride)
+        localArray[localId] += localArray[localId + stride];
+     }
+
+     if (localId == 0)
+    vout.Vec3ArrayOut[workgroupid] = localArray[0];*/

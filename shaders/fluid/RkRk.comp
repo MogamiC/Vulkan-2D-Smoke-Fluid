@@ -1,0 +1,47 @@
+#version 450
+
+struct ProjectionVector {
+	float mPositionX;
+	float mDirectionP;
+	float mResidualR;
+};
+
+shared float localArray[1024];
+
+
+layout(binding = 0) buffer ProjectionVectorSSBOIn {
+   ProjectionVector CellArrayIn[ ];
+}ProjectionVectorIn;
+layout(binding = 1) buffer ResultSSBOOut {
+   float CellArrayOut[ ];
+}ResultOut;
+
+
+layout (local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+	uint globalid = uint(gl_GlobalInvocationID.x); 
+    uint globalSize=uint(gl_WorkGroupSize.x);
+    uint workgroupid=uint(gl_WorkGroupID.x);
+    uint localId=uint(gl_LocalInvocationID.x);
+
+    float r = ProjectionVectorIn.CellArrayIn[globalid].mResidualR;
+	float result = r * r;
+
+   
+    localArray[localId] = result;
+
+    for (uint stride = 1024 / 2; stride > 0; stride /= 2)
+     {
+      // Waiting for each 2x2 addition into given workgroup
+      barrier();
+
+      // Add elements 2 by 2 between local_id and local_id + stride
+      if (localId < stride)
+        localArray[localId] += localArray[localId + stride];
+     }
+
+     if (localId == 0){
+        ResultOut.CellArrayOut[workgroupid] = localArray[0];
+     }
+}

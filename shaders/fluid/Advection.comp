@@ -1,0 +1,347 @@
+#version 450
+
+struct SmokeGridCell2D {
+	float mVelocityU;
+	float mVelocityV;
+
+	float mPressure;
+	float mDensity;
+	float mConcentration;
+	float mTemperature;
+
+	uint mCellType;
+	uint mIndexCloest;
+};
+struct FluidUniform {
+	uint mMaxX;
+	uint mMaxY;
+
+	float mDeltaTime;
+	float mDeltaX;
+
+	float mDensityAir;
+	float mDensitySoot;
+	float mAlpha;
+
+	float mTemperatureAmbient;
+	float mBelta;
+};
+
+// Because 2d gird is stored in 1d array, so we need fiction that tansfer between XY of 2d grid and Index of 1d array
+// IndexToXY tansfer from Index of 1d array to XY of 2d grid
+// XYtoIndex tansfer from XY of 2d grid to Index of 1d array
+uvec2 IndexToXY(const uint fMaxX, const uint fIndex){
+	uint y = uint( floor( fIndex / fMaxX) );
+	uint x= fIndex - y * fMaxX;
+
+    uvec2 rtn;
+    rtn.x=x;
+    rtn.y=y;
+
+    return rtn;
+}
+uint XYtoIndex(const uint fMaxX, const uvec2 fXY){
+	uint rtn = fXY.x + fXY.y * fMaxX;
+    return rtn;
+}
+
+
+// XY index of 2d grid may be out of range (smaller than 0 or X bigger than MaxX -1 or Y bigger than MaxY -1)
+// Fiction is created to force XY index be in range
+uvec2 IndexLimited(ivec2 fIndex, const uint fMaxX, const uint fMaxY){
+	uvec2 rtn;
+	rtn.x=min(max(fIndex.x,0), int(fMaxX - 1));
+	rtn.y=min(max(fIndex.y,0), int(fMaxY - 1));
+	return rtn;
+}
+
+// In 2d grid, if we do 2d Linear Interpolation, we need data from 4 neighbour cell;
+// 4 Indices of 4 needed neighbour cell are different for Pressure, VelocityU and VelocityV
+// we need different fictions for Pressure and Velocity to get different Indices and Alpha/Belta;
+struct InterpolationPressureRtn{
+	uvec4 Index;
+	vec2 AlpahBelta;
+};
+InterpolationPressureRtn InterpolationPressure(const vec2 fPosition, const uint fMaxX, const uint fMaxY){
+	ivec2 IndexCell;
+	IndexCell.x= int(floor(fPosition.x - 0.5));
+	IndexCell.y= int(floor(fPosition.y - 0.5));
+
+	ivec2 IndexCellRight;
+	IndexCellRight.x = IndexCell.x + 1;
+	IndexCellRight.y = IndexCell.y;
+
+	ivec2 IndexCellUp;
+	IndexCellUp.x = IndexCell.x;
+	IndexCellUp.y = IndexCell.y + 1;
+
+	ivec2 IndexCellUpRight;
+	IndexCellUpRight.x = IndexCell.x + 1;
+	IndexCellUpRight.y = IndexCell.y + 1;
+
+	uvec2 IndexCellLimites=IndexLimited(IndexCell, fMaxX, fMaxY);
+	uvec2 IndexCellRightLimites=IndexLimited(IndexCellRight, fMaxX, fMaxY);
+	uvec2 IndexCellUpLimites=IndexLimited(IndexCellUp, fMaxX, fMaxY);
+	uvec2 IndexCellUpRightLimites=IndexLimited(IndexCellUpRight, fMaxX, fMaxY);
+	
+	float Alpha = fPosition.x - 0.5 - IndexCell.x;
+	float Belta = fPosition.y - 0.5 - IndexCell.y;;
+
+
+	InterpolationPressureRtn rtn;
+
+	rtn.Index.x = XYtoIndex(fMaxX,IndexCellLimites);
+	rtn.Index.y = XYtoIndex(fMaxX,IndexCellRightLimites);
+	rtn.Index.z = XYtoIndex(fMaxX,IndexCellUpLimites);
+	rtn.Index.w = XYtoIndex(fMaxX,IndexCellUpRightLimites);
+	rtn.AlpahBelta.x = Alpha;
+	rtn.AlpahBelta.y = Belta;
+
+	return rtn;
+}
+struct InterpolationVelocityRtn{
+	uvec4 IndexU;
+	vec2 AlpahBeltaU;
+	uvec4 IndexV;
+	vec2 AlpahBeltaV;
+};
+InterpolationVelocityRtn InterpolationVelocity(const vec2 fPosition, const uint fMaxX, const uint fMaxY){
+	ivec2 IndexU;
+	IndexU.x= int(floor(fPosition.x));
+	IndexU.y= int(floor(fPosition.y - 0.5));
+	ivec2 IndexURight;
+	IndexURight.x = IndexU.x + 1;
+	IndexURight.y = IndexU.y;
+	ivec2 IndexUUp;
+	IndexUUp.x = IndexU.x;
+	IndexUUp.y = IndexU.y + 1;
+	ivec2 IndexUUpRight;
+	IndexUUpRight.x = IndexU.x + 1;
+	IndexUUpRight.y = IndexU.y + 1;
+
+	uvec2 IndexULimites=IndexLimited(IndexU, fMaxX, fMaxY);
+	uvec2 IndexURightLimites=IndexLimited(IndexURight, fMaxX, fMaxY);
+	uvec2 IndexUUpLimites=IndexLimited(IndexUUp, fMaxX, fMaxY);
+	uvec2 IndexUUpRightLimites=IndexLimited(IndexUUpRight, fMaxX, fMaxY);
+
+	float AlphaU = fPosition.x - IndexU.x;
+	float BeltaU = fPosition.y - 0.5 - IndexU.y;;
+	
+	ivec2 IndexV;
+	IndexV.x= int(floor(fPosition.x - 0.5));
+	IndexV.y= int(floor(fPosition.y));
+	ivec2 IndexVRight;
+	IndexVRight.x = IndexV.x + 1;
+	IndexVRight.y = IndexV.y;
+	ivec2 IndexVUp;
+	IndexVUp.x = IndexV.x;
+	IndexVUp.y = IndexV.y + 1;
+	ivec2 IndexVUpRight;
+	IndexVUpRight.x = IndexV.x + 1;
+	IndexVUpRight.y = IndexV.y + 1;
+
+	uvec2 IndexVLimites=IndexLimited(IndexV, fMaxX, fMaxY);
+	uvec2 IndexVRightLimites=IndexLimited(IndexVRight, fMaxX, fMaxY);
+	uvec2 IndexVUpLimites=IndexLimited(IndexVUp, fMaxX, fMaxY);
+	uvec2 IndexVUpRightLimites=IndexLimited(IndexVUpRight, fMaxX, fMaxY);
+	
+	float AlphaV = fPosition.x - 0.5 - IndexV.x;
+	float BeltaV = fPosition.y - IndexV.y;;
+
+	InterpolationVelocityRtn rtn;
+	rtn.IndexU.x = XYtoIndex(fMaxX,IndexULimites);
+	rtn.IndexU.y = XYtoIndex(fMaxX,IndexURightLimites);
+	rtn.IndexU.z = XYtoIndex(fMaxX,IndexUUpLimites);
+	rtn.IndexU.w = XYtoIndex(fMaxX,IndexUUpRightLimites);
+	rtn.AlpahBeltaU.x = AlphaU;
+	rtn.AlpahBeltaU.y = BeltaU;
+
+	rtn.IndexV.x = XYtoIndex(fMaxX,IndexVLimites);
+	rtn.IndexV.y = XYtoIndex(fMaxX,IndexVRightLimites);
+	rtn.IndexV.z = XYtoIndex(fMaxX,IndexVUpLimites);
+	rtn.IndexV.w = XYtoIndex(fMaxX,IndexVUpRightLimites);
+	rtn.AlpahBeltaV.x = AlphaV;
+	rtn.AlpahBeltaV.y = BeltaV;
+
+	return rtn;
+}
+// Using data from 4 neighbour cell and Alpha/Belta to calculate FINAL data
+float Interpolation2D(float fAlpha, float fBelta, float fData0, float fData1, float fData2, float fData3){
+	float Data4 = (1 - fAlpha) * fData0 + fAlpha * fData1;
+	float Data5 = (1 - fAlpha) * fData2 + fAlpha * fData3;
+	float Data6 = (1 - fBelta) * Data4 + fBelta * Data5;
+	return Data6;
+}
+float Interpolation2D(vec2 AlphaBelta, float fData0, float fData1, float fData2, float fData3){
+	float rtn = Interpolation2D(AlphaBelta.x, AlphaBelta.y, fData0, fData1, fData2, fData3);
+	return rtn;
+}
+
+layout(binding = 0) readonly buffer Vec3ArraySSBOIn {
+   SmokeGridCell2D CellArrayIn[ ];
+}vin;
+layout(binding = 1) buffer Vec3ArraySSBOOut {
+   SmokeGridCell2D CellArrayOut[ ];
+}vout;
+layout(binding = 2) uniform FluidUfo {
+  FluidUniform ufo;
+}Ufo;
+
+layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+	uint globalid = uint(gl_GlobalInvocationID.x); 
+
+    vec2 PositionGrid = IndexToXY(Ufo.ufo.mMaxX, globalid);
+
+	vec2 PositionCenter;
+	PositionCenter.x = PositionGrid.x + 0.5;
+	PositionCenter.y = PositionGrid.y + 0.5;
+
+	
+	vec2 PositionU;
+	PositionU.x = PositionGrid.x;
+	PositionU.y = PositionGrid.y + 0.5;
+	
+	vec2 PositionV;
+	PositionV.x = PositionGrid.x + 0.5;
+	PositionV.y = PositionGrid.y;
+
+	for(uint i = 0; i < 3;++i){
+		InterpolationVelocityRtn IndexCenter = InterpolationVelocity(PositionCenter, Ufo.ufo.mMaxX, Ufo.ufo.mMaxY);
+		
+		float VelocityCenterU0 = vin.CellArrayIn[IndexCenter.IndexU.x].mVelocityU;
+		float VelocityCenterU1 = vin.CellArrayIn[IndexCenter.IndexU.y].mVelocityU;
+		float VelocityCenterU2 = vin.CellArrayIn[IndexCenter.IndexU.z].mVelocityU;
+		float VelocityCenterU3 = vin.CellArrayIn[IndexCenter.IndexU.w].mVelocityU;
+
+		float VelocityCenterV0 = vin.CellArrayIn[IndexCenter.IndexV.x].mVelocityV;
+		float VelocityCenterV1 = vin.CellArrayIn[IndexCenter.IndexV.y].mVelocityV;
+		float VelocityCenterV2 = vin.CellArrayIn[IndexCenter.IndexV.z].mVelocityV;
+		float VelocityCenterV3 = vin.CellArrayIn[IndexCenter.IndexV.w].mVelocityV;
+		
+		float VelocityCenterU = Interpolation2D(IndexCenter.AlpahBeltaU, 
+		VelocityCenterU0, VelocityCenterU1, VelocityCenterU2, VelocityCenterU3);
+
+		float VelocityCenterV = Interpolation2D(IndexCenter.AlpahBeltaV, 
+		VelocityCenterV0, VelocityCenterV1, VelocityCenterV2, VelocityCenterV3);
+
+		vec2 VelocityCenter;
+		VelocityCenter.x = VelocityCenterU;
+		VelocityCenter.y = VelocityCenterV;
+
+		
+		
+		InterpolationVelocityRtn InterpolationIndexU = InterpolationVelocity(PositionU, Ufo.ufo.mMaxX, Ufo.ufo.mMaxY);
+		
+		float VelocityU_U0 = vin.CellArrayIn[InterpolationIndexU.IndexU.x].mVelocityU;
+		float VelocityU_U1 = vin.CellArrayIn[InterpolationIndexU.IndexU.y].mVelocityU;
+		float VelocityU_U2 = vin.CellArrayIn[InterpolationIndexU.IndexU.z].mVelocityU;
+		float VelocityU_U3 = vin.CellArrayIn[InterpolationIndexU.IndexU.w].mVelocityU;
+
+		float VelocityU_V0 = vin.CellArrayIn[InterpolationIndexU.IndexV.x].mVelocityV;
+		float VelocityU_V1 = vin.CellArrayIn[InterpolationIndexU.IndexV.y].mVelocityV;
+		float VelocityU_V2 = vin.CellArrayIn[InterpolationIndexU.IndexV.z].mVelocityV;
+		float VelocityU_V3 = vin.CellArrayIn[InterpolationIndexU.IndexV.w].mVelocityV;
+		
+		float VelocityU_U = Interpolation2D(InterpolationIndexU.AlpahBeltaU, 
+		VelocityU_U0, VelocityU_U1, VelocityU_U2, VelocityU_U3);
+		
+		float VelocityU_V = Interpolation2D(InterpolationIndexU.AlpahBeltaV, 
+		VelocityU_V0, VelocityU_V1, VelocityU_V2, VelocityU_V3);
+
+		vec2 VelocityU;
+		VelocityU.x = VelocityU_U;
+		VelocityU.y = VelocityU_V;
+
+
+
+		InterpolationVelocityRtn InterpolationIndexV = InterpolationVelocity(PositionV, Ufo.ufo.mMaxX, Ufo.ufo.mMaxY);
+		
+		float VelocityV_U0 = vin.CellArrayIn[InterpolationIndexV.IndexU.x].mVelocityU;
+		float VelocityV_U1 = vin.CellArrayIn[InterpolationIndexV.IndexU.y].mVelocityU;
+		float VelocityV_U2 = vin.CellArrayIn[InterpolationIndexV.IndexU.z].mVelocityU;
+		float VelocityV_U3 = vin.CellArrayIn[InterpolationIndexV.IndexU.w].mVelocityU;
+
+		float VelocityV_V0 = vin.CellArrayIn[InterpolationIndexV.IndexV.x].mVelocityV;
+		float VelocityV_V1 = vin.CellArrayIn[InterpolationIndexV.IndexV.y].mVelocityV;
+		float VelocityV_V2 = vin.CellArrayIn[InterpolationIndexV.IndexV.z].mVelocityV;
+		float VelocityV_V3 = vin.CellArrayIn[InterpolationIndexV.IndexV.w].mVelocityV;
+
+		float VelocityV_U = Interpolation2D(InterpolationIndexV.AlpahBeltaU, 
+		VelocityV_U0, VelocityV_U1, VelocityV_U2, VelocityV_U3);
+		
+		float VelocityV_V = Interpolation2D(InterpolationIndexV.AlpahBeltaV, 
+		VelocityV_V0, VelocityV_V1, VelocityV_V2, VelocityV_V3);
+
+		vec2 VelocityV;
+		VelocityV.x = VelocityV_U;
+		VelocityV.y = VelocityV_V;
+		
+		
+		PositionCenter = PositionCenter - VelocityCenter/3;
+		
+		PositionU = PositionU - VelocityU/3;
+		PositionV = PositionV - VelocityV/3;
+	}
+	
+	InterpolationPressureRtn FinalPressure = InterpolationPressure(PositionCenter, Ufo.ufo.mMaxX, Ufo.ufo.mMaxY);
+	
+	SmokeGridCell2D Data0 = vin.CellArrayIn[FinalPressure.Index.x];
+	SmokeGridCell2D Data1 = vin.CellArrayIn[FinalPressure.Index.y];
+	SmokeGridCell2D Data2 = vin.CellArrayIn[FinalPressure.Index.z];
+	SmokeGridCell2D Data3 = vin.CellArrayIn[FinalPressure.Index.w];
+	
+	float FinalTemperature = Interpolation2D(FinalPressure.AlpahBelta, 
+		Data0.mTemperature, Data1.mTemperature, Data2.mTemperature, Data3.mTemperature);
+		
+	float FinalConcentration = Interpolation2D(FinalPressure.AlpahBelta, 
+		Data0.mConcentration, Data1.mConcentration, Data2.mConcentration, Data3.mConcentration);
+
+
+	/*
+	InterpolationVelocityRtn FinalVelocity = InterpolationVelocity(PositionCenter, Ufo.ufo.mMaxX, Ufo.ufo.mMaxY);
+	float FinalVelocityU0 = vin.CellArrayIn[FinalVelocity.IndexU.x].mVelocityU;
+	float FinalVelocityU1 = vin.CellArrayIn[FinalVelocity.IndexU.y].mVelocityU;
+	float FinalVelocityU2 = vin.CellArrayIn[FinalVelocity.IndexU.z].mVelocityU;
+	float FinalVelocityU3 = vin.CellArrayIn[FinalVelocity.IndexU.w].mVelocityU;
+	vec2 FinalAlphaBeltaU = FinalVelocity.AlpahBeltaU;
+
+	float FinalVelocityV0 = vin.CellArrayIn[FinalVelocity.IndexV.x].mVelocityV;
+	float FinalVelocityV1 = vin.CellArrayIn[FinalVelocity.IndexV.y].mVelocityV;
+	float FinalVelocityV2 = vin.CellArrayIn[FinalVelocity.IndexV.z].mVelocityV;
+	float FinalVelocityV3 = vin.CellArrayIn[FinalVelocity.IndexV.w].mVelocityV;
+	vec2 FinalAlphaBeltaV = FinalVelocity.AlpahBeltaV;*/
+
+	
+	InterpolationVelocityRtn FinalVelocityU = InterpolationVelocity(PositionU, Ufo.ufo.mMaxX, Ufo.ufo.mMaxY);
+	float FinalVelocityU0 = vin.CellArrayIn[FinalVelocityU.IndexU.x].mVelocityU;
+	float FinalVelocityU1 = vin.CellArrayIn[FinalVelocityU.IndexU.y].mVelocityU;
+	float FinalVelocityU2 = vin.CellArrayIn[FinalVelocityU.IndexU.z].mVelocityU;
+	float FinalVelocityU3 = vin.CellArrayIn[FinalVelocityU.IndexU.w].mVelocityU;
+	vec2 FinalAlphaBeltaU = FinalVelocityU.AlpahBeltaU;
+	
+	InterpolationVelocityRtn FinalVelocityV = InterpolationVelocity(PositionV, Ufo.ufo.mMaxX, Ufo.ufo.mMaxY);
+	float FinalVelocityV0 = vin.CellArrayIn[FinalVelocityV.IndexV.x].mVelocityV;
+	float FinalVelocityV1 = vin.CellArrayIn[FinalVelocityV.IndexV.y].mVelocityV;
+	float FinalVelocityV2 = vin.CellArrayIn[FinalVelocityV.IndexV.z].mVelocityV;
+	float FinalVelocityV3 = vin.CellArrayIn[FinalVelocityV.IndexV.w].mVelocityV;
+	vec2 FinalAlphaBeltaV = FinalVelocityV.AlpahBeltaV;
+
+
+
+	vout.CellArrayOut[globalid].mVelocityU = Interpolation2D(FinalAlphaBeltaU, 
+		FinalVelocityU0, FinalVelocityU1, FinalVelocityU2, FinalVelocityU3);
+	vout.CellArrayOut[globalid].mVelocityV = Interpolation2D(FinalAlphaBeltaV, 
+		FinalVelocityV0, FinalVelocityV1, FinalVelocityV2, FinalVelocityV3);
+
+	
+	vout.CellArrayOut[globalid].mPressure  = vin.CellArrayIn[globalid].mPressure;
+	vout.CellArrayOut[globalid].mDensity  = vin.CellArrayIn[globalid].mDensity;
+	vout.CellArrayOut[globalid].mConcentration =  FinalConcentration;
+	vout.CellArrayOut[globalid].mTemperature =  FinalTemperature;
+
+	
+	vout.CellArrayOut[globalid].mCellType  = vin.CellArrayIn[globalid].mCellType;
+	vout.CellArrayOut[globalid].mIndexCloest  = vin.CellArrayIn[globalid].mIndexCloest;
+}
