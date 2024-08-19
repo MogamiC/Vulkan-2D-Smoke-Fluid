@@ -1,0 +1,113 @@
+#version 450
+
+uvec2 IndexToXY(const uint fMaxX, const uint fIndex){
+	uint y = uint( floor( fIndex / fMaxX) );
+	uint x= fIndex - y * fMaxX;
+
+    uvec2 rtn;
+    rtn.x=x;
+    rtn.y=y;
+
+    return rtn;
+}
+uint XYtoIndex(const uint fMaxX, const uvec2 fXY){
+	uint rtn = fXY.x + fXY.y * fMaxX;
+    return rtn;
+}
+
+struct FluidUniform {
+	uint mMaxX;
+	uint mMaxY;
+
+	float mDeltaTime;
+	float mDeltaX;
+
+	float mDensityAir;
+	float mDensitySoot;
+	float mAlpha;
+
+	float mTemperatureAmbient;
+	float mBelta;
+};
+
+layout(binding = 0) buffer Vec3ArraySSBOOut1 {
+   vec4 CellArray[ ];
+}vout1;
+layout(binding = 1) buffer Vec3ArraySSBOOut2 {
+   vec4 CellArray[ ];
+}vout2;
+layout(binding = 2) uniform FluidUfo {
+  FluidUniform ufo;
+}Ufo;
+
+
+layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+	uint globalid = uint(gl_GlobalInvocationID.x); 
+
+	uint Index = globalid * 6;
+
+	uint MaxX = Ufo.ufo.mMaxX;
+	uint MaxY = Ufo.ufo.mMaxY;
+
+	uvec2 CellIndex = IndexToXY(MaxX, globalid);
+	float x = CellIndex.x;
+	float y = CellIndex.y;
+
+
+	vec4 v0;
+	v0.x = x;
+	v0.y = y;
+	v0.z = 0;
+	v0.w = 1;
+	
+	vec4 v1;
+	v1.x = x + 1;
+	v1.y = y;
+	v1.z = 0;
+	v1.w = 1;
+
+	vec4 v2;
+	v2.x = x;
+	v2.y = y + 1;
+	v2.z = 0;
+	v2.w = 1;
+
+	vec4 v3;
+	v3.x = x + 1;
+	v3.y = y + 1;
+	v3.z = 0;
+	v3.w = 1;
+
+	mat4 PosiM=mat4(2.0/MaxX,0,0,0,
+	0,-2.0/MaxY,0,0,
+	0,0,1,0,
+	-1,1,0,1);
+
+	
+	v0 = PosiM * v0;
+	v1 = PosiM * v1;
+	v2 = PosiM * v2;
+	v3 = PosiM * v3;
+	
+	v0.z = 0;
+	v1.z = 0;
+	v2.z = 0;
+	v3.z = 0;
+
+
+	vout1.CellArray[globalid * 6] = v0;
+	vout1.CellArray[globalid * 6 + 1] = v1;
+	vout1.CellArray[globalid * 6 + 2] = v2;
+	vout1.CellArray[globalid * 6 + 3] = v2;
+	vout1.CellArray[globalid * 6 + 4] = v1;
+	vout1.CellArray[globalid * 6 + 5] = v3;
+	
+	vout2.CellArray[globalid * 6] = v0;
+	vout2.CellArray[globalid * 6 + 1] = v1;
+	vout2.CellArray[globalid * 6 + 2] = v2;
+	vout2.CellArray[globalid * 6 + 3] = v2;
+	vout2.CellArray[globalid * 6 + 4] = v1;
+	vout2.CellArray[globalid * 6 + 5] = v3;
+}

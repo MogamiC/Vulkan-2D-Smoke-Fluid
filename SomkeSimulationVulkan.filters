@@ -1,0 +1,92 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="头文件\shader">
+      <UniqueIdentifier>{837ff6f1-a76c-474f-9583-1a2e52cf3753}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\shader\fiuid">
+      <UniqueIdentifier>{47cc4859-0d65-46fa-9c2f-4e428e591a74}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main1.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanApp.cpp">
+      <Filter>头文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\fluid\Advection.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\Buoyancy.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\ProjectionInit.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\PkAPk.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\RkRk.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\PkAPkSum.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\RkRkSum.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\Rk.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\Xk.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\Pk.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\Final.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\DrawInit.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\DrawVert.vert">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\DrawFrag.frag">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+    <None Include="shaders\fluid\InputData.comp">
+      <Filter>头文件\shader\fiuid</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="VulkanFluid.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanApp.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanMember.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="DefNConst.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

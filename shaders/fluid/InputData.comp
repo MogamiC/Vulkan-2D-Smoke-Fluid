@@ -1,0 +1,109 @@
+#version 450
+
+struct SmokeGridCell2D {
+	float mVelocityU;
+	float mVelocityV;
+
+	float mPressure;
+	float mDensity;
+	float mConcentration;
+	float mTemperature;
+
+	uint mCellType;
+	uint mIndexCloest;
+};
+struct FluidUniform {
+	uint mMaxX;
+	uint mMaxY;
+
+	float mDeltaTime;
+	float mDeltaX;
+
+	float mDensityAir;
+	float mDensitySoot;
+	float mAlpha;
+
+	float mTemperatureAmbient;
+	float mBelta;
+};
+struct InputData {
+	float mCenterX;
+	float mCenterY;
+	uint mLengthX;
+	uint mLengthY;
+
+	float mVelocityU;
+	float mVelocityV;
+	
+	float mConcentration;
+	float mTemperature;
+};
+
+uvec2 IndexToXY(const uint fMaxX, const uint fIndex){
+	uint y = uint( floor( fIndex / fMaxX) );
+	uint x= fIndex - y * fMaxX;
+
+    uvec2 rtn;
+    rtn.x=x;
+    rtn.y=y;
+
+    return rtn;
+}
+
+layout (binding = 0) uniform InputDataConst {
+   InputData CellArray[4];
+}InputDataArray;
+layout(binding = 1) uniform FluidUniformConst {
+   FluidUniform ufo;
+}Ufo;
+layout(std430, binding = 2) buffer InputSSBO {
+   SmokeGridCell2D CellArray[ ];
+}InputSSBOArray;
+
+layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+
+void main() {
+	uint globalid = uint(gl_GlobalInvocationID.x); 
+    uint globalSize=uint(gl_WorkGroupSize.x);
+    uint workgroupid=uint(gl_WorkGroupID.x);
+    uint localId=uint(gl_LocalInvocationID.x);
+
+	uvec2 GridIndex = IndexToXY(Ufo.ufo.mMaxX, globalid);
+
+	if(InputSSBOArray.CellArray[globalid].mCellType != 1){
+		InputSSBOArray.CellArray[globalid].mCellType = 0;
+	}
+
+	for (int i = 0; i < 4; ++i) {
+		InputData data = InputDataArray.CellArray[i];
+		vec2 InputIndex;
+		InputIndex.x = data.mCenterX;
+		InputIndex.y = data.mCenterY;
+		if((GridIndex.x > (InputIndex.x - data.mLengthX))&&(GridIndex.x < (InputIndex.x + data.mLengthX))){
+			if((GridIndex.y > (InputIndex.y - data.mLengthY))&&(GridIndex.y < (InputIndex.y + data.mLengthY))){
+				if(InputSSBOArray.CellArray[globalid].mCellType != 1){
+					InputSSBOArray.CellArray[globalid].mCellType = 2;
+
+					InputSSBOArray.CellArray[globalid].mVelocityU = data.mVelocityU;
+					InputSSBOArray.CellArray[globalid].mVelocityV = data.mVelocityV;
+					InputSSBOArray.CellArray[globalid].mTemperature = data.mTemperature;
+					InputSSBOArray.CellArray[globalid].mConcentration = data.mConcentration;
+				}
+			}
+		}
+		/*
+		if(length(GridIndex - InputIndex)<data.mRadius){
+			if(InputSSBOArray.CellArray[globalid].mCellType != 1){
+				InputSSBOArray.CellArray[globalid].mCellType = 2;
+				InputSSBOArray.CellArray[globalid].mVelocityU = data.mVelocityU;
+				InputSSBOArray.CellArray[globalid].mVelocityV = data.mVelocityV;
+				InputSSBOArray.CellArray[globalid].mTemperature = data.mTemperature;
+				InputSSBOArray.CellArray[globalid].mConcentration = data.mConcentration;
+				}
+		}
+		*/
+
+
+	}
+}

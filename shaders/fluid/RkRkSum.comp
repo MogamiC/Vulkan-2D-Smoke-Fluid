@@ -1,0 +1,70 @@
+#version 450
+
+struct ProjectionUniform {
+	float mRkRk;
+	float mPkAPk;
+	// mDistanceAlpha = RkRk/PkAPk
+	float mDistanceAlpha;
+	// mDirectionBelta = R(k+1)R(k+1)/RkRk
+	float mDirectionBelta;
+
+	// 0. Init() change mRkRk
+	// 1. PkaPk() change mPkAPk & mDistanceAlpha
+	// 4. Rk+1Rk+1() change mDirectionBelta then RkRk = R(k+1)R(k+1) 
+
+	
+	float mRkBiggest;
+};
+
+struct SumData {
+	float sum;
+	float biggest;
+};
+
+shared float localArray[1024];
+shared float localBiggestArray[1024];
+
+
+layout(std430, binding = 0) buffer FloatSSBOIn {
+   SumData CellArrayIn[ ];
+} FloatIn;
+layout(binding = 1) buffer ProjectionUniformOut {
+  ProjectionUniform ufo;
+} UfoOut;
+
+layout (local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+
+	uint globalid = uint(gl_GlobalInvocationID.x); 
+    uint globalSize = uint(gl_WorkGroupSize.x);
+    uint workgroupid = uint(gl_WorkGroupID.x);
+    uint localId = uint(gl_LocalInvocationID.x);
+
+    
+    localArray[localId] = FloatIn.CellArrayIn[globalid].sum;
+    localBiggestArray[localId] = FloatIn.CellArrayIn[globalid].biggest;
+
+    FloatIn.CellArrayIn[globalid].biggest = 0;
+
+    for (uint stride = 1024 / 2; stride > 0; stride /= 2)
+     {
+      // Waiting for each 2x2 addition into given workgroup
+      barrier();
+
+      // Add elements 2 by 2 between local_id and local_id + stride
+      if (localId < stride){
+		localBiggestArray[localId] = max(localBiggestArray[localId] ,localBiggestArray[localId + stride]);
+        localArray[localId] = localArray[localId] + localArray[localId + stride];
+      }
+     }
+
+     float a = 1.0 / UfoOut.ufo.mRkRk;
+
+     if (localId == 0){
+        UfoOut.ufo.mDirectionBelta = localArray[0] * a;
+        UfoOut.ufo.mRkRk = localArray[0];
+        UfoOut.ufo.mRkBiggest = localBiggestArray[0];
+     }
+
+}
